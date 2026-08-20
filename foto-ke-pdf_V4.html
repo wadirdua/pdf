@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Foto ke PDF</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<style>
+  :root{
+    --paper:#F6F3EC; --ink:#1B2A4A; --charcoal:#33363B; --teal:#2C5F5D; --teal-dark:#204443;
+    --amber:#C17817; --line:#DAD3C3; --card:#FFFFFF; --muted:#7C7568;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--charcoal);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:760px;margin:0 auto;padding:24px 16px 90px;}
+  header{border-bottom:2px solid var(--ink);padding-bottom:14px;margin-bottom:20px;}
+  header h1{font-size:24px;margin:0;color:var(--ink);letter-spacing:-0.01em;}
+  header .sub{font-size:13px;color:var(--muted);margin-top:4px;}
+
+  .drop{
+    border:2px dashed var(--line);border-radius:10px;padding:32px 16px;text-align:center;
+    background:var(--card);cursor:pointer;transition:border-color .15s, background .15s;
+  }
+  .drop.drag{border-color:var(--teal);background:#EEF5F3;}
+  .drop .icon{font-size:34px;margin-bottom:8px;}
+  .drop .txt{font-size:14.5px;color:var(--ink);font-weight:600;}
+  .drop .txt2{font-size:12.5px;color:var(--muted);margin-top:4px;}
+  input[type=file]{display:none;}
+
+  .toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:18px 0 10px;flex-wrap:wrap;}
+  .toolbar .count{font-size:13px;color:var(--muted);}
+  .opts{display:flex;align-items:center;gap:14px;font-size:13px;color:var(--charcoal);flex-wrap:wrap;}
+  .opts label{display:flex;align-items:center;gap:6px;cursor:pointer;}
+  select{font-family:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink);}
+
+  .list{display:flex;flex-direction:column;gap:8px;margin-bottom:20px;}
+  .item{
+    display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);
+    border-radius:8px;padding:8px;
+  }
+  .item img{width:52px;height:52px;object-fit:cover;border-radius:4px;flex-shrink:0;background:var(--paper);}
+  .item .meta{flex:1;min-width:0;}
+  .item .name{font-size:13px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .item .size{font-size:11.5px;color:var(--muted);}
+  .item .btns{display:flex;gap:4px;flex-shrink:0;}
+  .item button{
+    border:1px solid var(--line);background:var(--paper);color:var(--charcoal);border-radius:6px;
+    width:30px;height:30px;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  }
+  .item button:hover{border-color:var(--teal);color:var(--teal);}
+  .item button.rm:hover{border-color:#b23b3b;color:#b23b3b;}
+  .item button:disabled{opacity:.3;cursor:default;}
+
+  .empty{text-align:center;color:var(--muted);font-size:13px;padding:24px 0;}
+
+  .sizehint{font-size:12px;color:var(--muted);margin-bottom:12px;}
+
+  .actions{position:sticky;bottom:0;background:linear-gradient(to top, var(--paper) 70%, transparent);padding:16px 0 4px;}
+  .btn-primary{
+    width:100%;background:var(--teal);color:#fff;border:none;border-radius:8px;padding:14px;
+    font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;
+  }
+  .btn-primary:hover{background:var(--teal-dark);}
+  .btn-primary:disabled{background:#B7C4C3;cursor:default;}
+
+  .fname{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+  .fname label{font-size:12.5px;color:var(--muted);white-space:nowrap;}
+  .fname input{flex:1;font-family:inherit;font-size:13.5px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink);}
+  .fname input:focus{outline:none;border-color:var(--teal);}
+
+  .toast{
+    position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);
+    background:var(--ink);color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;
+    opacity:0;pointer-events:none;transition:opacity .2s, transform .2s;z-index:50;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  .tabs{display:flex;gap:6px;margin-bottom:18px;border-bottom:1px solid var(--line);}
+  .tab{
+    border:none;background:none;font-family:inherit;font-size:13.5px;font-weight:600;color:var(--muted);
+    padding:10px 4px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;
+  }
+  .tab.active{color:var(--ink);border-bottom-color:var(--teal);}
+  .panel{display:none;}
+  .panel.active{display:block;}
+
+  .item .pdficon{
+    width:52px;height:52px;border-radius:4px;flex-shrink:0;background:var(--paper);
+    display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--teal-dark);
+    font-weight:700;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1 id="pageTitle">Foto ke PDF</h1>
+    <div class="sub" id="pageSub">Ubah satu atau beberapa foto menjadi satu file PDF, langsung dari browser.</div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" id="tabConvertBtn" data-tab="convert">Foto ke PDF</button>
+    <button class="tab" id="tabMergeBtn" data-tab="merge">Gabung PDF</button>
+  </div>
+
+  <div class="panel active" id="panelConvert">
+    <div class="drop" id="drop">
+      <div class="icon">📷</div>
+      <div class="txt">Ketuk untuk pilih foto, atau seret &amp; lepas di sini</div>
+      <div class="txt2">Bisa pilih banyak foto sekaligus (JPG, PNG, dll)</div>
+      <input type="file" id="fileInput" accept="image/*" multiple>
+    </div>
+
+    <div class="toolbar">
+      <div class="count" id="count">Belum ada foto dipilih</div>
+      <div class="opts">
+        <label>Ukuran halaman
+          <select id="pageSize">
+            <option value="a4">A4</option>
+            <option value="fit">Sesuai ukuran foto</option>
+          </select>
+        </label>
+        <label>Kompresi
+          <select id="compressLevel">
+            <option value="high">Kecil (kualitas standar)</option>
+            <option value="medium" selected>Sedang (disarankan)</option>
+            <option value="low">Ringan (kualitas lebih tinggi)</option>
+            <option value="none">Tanpa kompresi (ukuran asli)</option>
+          </select>
+        </label>
+        <label>Efek hasil
+          <select id="scanEffect">
+            <option value="none" selected>Foto asli (berwarna)</option>
+            <option value="gray">Abu-abu rapi (mirip mesin scan)</option>
+            <option value="bw">Hitam-putih tajam (dokumen scan)</option>
+          </select>
+        </label>
+      </div>
+    </div>
+    <div class="sizehint" id="sizehint"></div>
+
+    <div class="list" id="list"></div>
+
+    <div class="actions">
+      <div class="fname">
+        <label for="outName">Nama file</label>
+        <input type="text" id="outName" value="dokumen">
+      </div>
+      <button class="btn-primary" id="convertBtn" disabled>Konversi ke PDF</button>
+    </div>
+  </div>
+
+  <div class="panel" id="panelMerge">
+    <div class="drop" id="dropMerge">
+      <div class="icon">📄</div>
+      <div class="txt">Ketuk untuk pilih file PDF, atau seret &amp; lepas di sini</div>
+      <div class="txt2">Pilih dua atau lebih file PDF untuk digabung jadi satu</div>
+      <input type="file" id="fileInputMerge" accept="application/pdf" multiple>
+    </div>
+
+    <div class="toolbar">
+      <div class="count" id="countMerge">Belum ada PDF dipilih</div>
+    </div>
+    <div class="sizehint" id="sizehintMerge"></div>
+
+    <div class="list" id="listMerge"></div>
+
+    <div class="actions">
+      <div class="fname">
+        <label for="outNameMerge">Nama file</label>
+        <input type="text" id="outNameMerge" value="gabungan">
+      </div>
+      <button class="btn-primary" id="mergeBtn" disabled>Gabungkan PDF</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+let items = []; // { file, dataUrl, id }
+let seq = 0;
+let mergeItems = []; // { file, id }
+let mergeSeq = 0;
+
+const TAB_INFO = {
+  convert: { title: 'Foto ke PDF', sub: 'Ubah satu atau beberapa foto menjadi satu file PDF, langsung dari browser.' },
+  merge:   { title: 'Gabung PDF', sub: 'Gabungkan beberapa file PDF menjadi satu file PDF, langsung dari browser.' }
+};
+document.querySelectorAll('.tab').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const tab = btn.dataset.tab;
+    document.querySelectorAll('.tab').forEach(b=> b.classList.toggle('active', b === btn));
+    $('panelConvert').classList.toggle('active', tab === 'convert');
+    $('panelMerge').classList.toggle('active', tab === 'merge');
+    $('pageTitle').textContent = TAB_INFO[tab].title;
+    $('pageSub').textContent = TAB_INFO[tab].sub;
+  });
+});
+
+function toast(msg){
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(()=> t.classList.remove('show'), 2400);
+}
+
+function fileToDataUrl(file){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=> resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function formatSize(bytes){
+  if(bytes < 1024) return bytes + ' B';
+  if(bytes < 1024*1024) return (bytes/1024).toFixed(0) + ' KB';
+  return (bytes/(1024*1024)).toFixed(1) + ' MB';
+}
+
+async function addFiles(fileList){
+  const files = Array.from(fileList).filter(f => f.type.startsWith('image/'));
+  if(!files.length){ toast('Tidak ada file gambar yang valid'); return; }
+  for(const file of files){
+    try{
+      const dataUrl = await fileToDataUrl(file);
+      items.push({ id: seq++, file, dataUrl });
+    }catch(e){ /* skip file yang gagal dibaca */ }
+  }
+  render();
+}
+
+function render(){
+  const listEl = $('list');
+  if(items.length === 0){
+    listEl.innerHTML = '<div class="empty">Belum ada foto. Tambahkan foto di atas untuk mulai.</div>';
+  } else {
+    listEl.innerHTML = items.map((it, i)=> `
+      <div class="item" data-id="${it.id}">
+        <img src="${it.dataUrl}">
+        <div class="meta">
+          <div class="name">${escapeHtml(it.file.name || 'foto')}</div>
+          <div class="size">${formatSize(it.file.size)}</div>
+        </div>
+        <div class="btns">
+          <button data-act="up" ${i===0?'disabled':''} title="Naikkan urutan">↑</button>
+          <button data-act="down" ${i===items.length-1?'disabled':''} title="Turunkan urutan">↓</button>
+          <button data-act="rm" class="rm" title="Hapus">&times;</button>
+        </div>
+      </div>
+    `).join('');
+  }
+  $('count').textContent = items.length ? `${items.length} foto dipilih — urutan di atas jadi urutan halaman PDF` : 'Belum ada foto dipilih';
+  $('convertBtn').disabled = items.length === 0;
+  updateSizeHint();
+}
+
+function updateSizeHint(){
+  const hint = $('sizehint');
+  if(items.length === 0){ hint.textContent = ''; return; }
+  const totalOriginal = items.reduce((sum, it)=> sum + it.file.size, 0);
+  hint.textContent = `Total ukuran foto asli: ${formatSize(totalOriginal)} — hasil PDF akan ditampilkan setelah konversi`;
+}
+$('compressLevel').addEventListener('change', updateSizeHint);
+
+function escapeHtml(s){
+  return (s||'').toString().replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+$('list').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button'); if(!btn) return;
+  const itemEl = e.target.closest('.item');
+  const id = Number(itemEl.dataset.id);
+  const idx = items.findIndex(it => it.id === id);
+  if(idx === -1) return;
+  const act = btn.dataset.act;
+  if(act === 'rm'){
+    items.splice(idx, 1);
+  } else if(act === 'up' && idx > 0){
+    [items[idx-1], items[idx]] = [items[idx], items[idx-1]];
+  } else if(act === 'down' && idx < items.length - 1){
+    [items[idx+1], items[idx]] = [items[idx], items[idx+1]];
+  }
+  render();
+});
+
+const drop = $('drop');
+drop.addEventListener('click', ()=> $('fileInput').click());
+$('fileInput').addEventListener('change', (e)=>{
+  addFiles(e.target.files);
+  e.target.value = '';
+});
+['dragenter','dragover'].forEach(ev=>{
+  drop.addEventListener(ev, (e)=>{ e.preventDefault(); drop.classList.add('drag'); });
+});
+['dragleave','drop'].forEach(ev=>{
+  drop.addEventListener(ev, (e)=>{ e.preventDefault(); drop.classList.remove('drag'); });
+});
+drop.addEventListener('drop', (e)=>{
+  if(e.dataTransfer && e.dataTransfer.files) addFiles(e.dataTransfer.files);
+});
+
+function loadImage(dataUrl){
+  return new Promise((resolve, reject)=>{
+    const img = new Image();
+    img.onload = ()=> resolve(img);
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+}
+
+const COMPRESS_PRESETS = {
+  high:   { maxWidth: 1200, quality: 0.55 },
+  medium: { maxWidth: 1600, quality: 0.72 },
+  low:    { maxWidth: 2000, quality: 0.85 },
+  none:   null
+};
+
+// Mengecilkan gambar lewat canvas: resize ke maxWidth (kalau lebih besar) lalu
+// re-encode sebagai JPEG dengan kualitas tertentu. Selalu jauh lebih kecil
+// dibanding foto asli dari kamera HP (biasanya 3-8 MB per foto).
+function compressImage(img, maxWidth, quality){
+  let w = img.width, h = img.height;
+  if(w > maxWidth){ h = Math.round(h * (maxWidth / w)); w = maxWidth; }
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  // latar putih dulu supaya PNG transparan tidak jadi hitam saat dijadikan JPEG
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, w, h);
+  ctx.drawImage(img, 0, 0, w, h);
+  return { dataUrl: canvas.toDataURL('image/jpeg', quality), width: w, height: h };
+}
+
+function dataUrlSizeBytes(dataUrl){
+  const base64 = dataUrl.split(',')[1] || '';
+  return Math.round(base64.length * 0.75);
+}
+
+// Menggambar foto ke canvas, resize ke maxWidth kalau diberikan (kalau tidak, ukuran asli).
+function renderToCanvas(img, maxWidth){
+  let w = img.width, h = img.height;
+  if(maxWidth && w > maxWidth){ h = Math.round(h * (maxWidth / w)); w = maxWidth; }
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, w, h);
+  ctx.drawImage(img, 0, 0, w, h);
+  return { canvas, ctx, w, h };
+}
+
+// Efek "hasil scan":
+// - 'gray'  : ubah ke abu-abu lalu naikkan kontras/kecerahan sedikit, mirip scanner grayscale.
+// - 'bw'    : threshold adaptif (algoritma Bradley, pakai integral image) — tiap piksel
+//             dibandingkan dengan rata-rata area sekitarnya, jadi hasil tetap bersih hitam-putih
+//             walau foto aslinya ada bayangan atau pencahayaan tidak rata (foto dari kamera HP).
+function applyScanEffect(ctx, w, h, mode){
+  if(mode === 'none') return;
+  const imgData = ctx.getImageData(0, 0, w, h);
+  const data = imgData.data;
+  const n = w * h;
+  const gray = new Float64Array(n);
+  for(let i = 0, p = 0; i < n; i++, p += 4){
+    gray[i] = 0.299 * data[p] + 0.587 * data[p + 1] + 0.114 * data[p + 2];
+  }
+
+  if(mode === 'gray'){
+    const contrast = 1.25, brightness = 12;
+    for(let i = 0, p = 0; i < n; i++, p += 4){
+      let v = (gray[i] - 128) * contrast + 128 + brightness;
+      v = v < 0 ? 0 : (v > 255 ? 255 : v);
+      data[p] = data[p + 1] = data[p + 2] = v;
+    }
+  } else if(mode === 'bw'){
+    // integral image dari nilai abu-abu, untuk hitung rata-rata area cepat (O(1) per piksel)
+    const integral = new Float64Array(n);
+    for(let y = 0; y < h; y++){
+      let rowSum = 0;
+      for(let x = 0; x < w; x++){
+        const idx = y * w + x;
+        rowSum += gray[idx];
+        integral[idx] = rowSum + (y > 0 ? integral[idx - w] : 0);
+      }
+    }
+    const S = Math.max(15, Math.floor(w / 12)); // ukuran jendela lokal, menyesuaikan lebar gambar
+    const s2 = Math.floor(S / 2);
+    const t = 0.15; // toleransi threshold (15% di bawah rata-rata lokal dianggap teks/gelap)
+    for(let y = 0; y < h; y++){
+      const y1 = Math.max(0, y - s2), y2 = Math.min(h - 1, y + s2);
+      for(let x = 0; x < w; x++){
+        const x1 = Math.max(0, x - s2), x2 = Math.min(w - 1, x + s2);
+        const count = (x2 - x1 + 1) * (y2 - y1 + 1);
+        const sum = integral[y2 * w + x2]
+          - (x1 > 0 ? integral[y2 * w + x1 - 1] : 0)
+          - (y1 > 0 ? integral[(y1 - 1) * w + x2] : 0)
+          + (x1 > 0 && y1 > 0 ? integral[(y1 - 1) * w + x1 - 1] : 0);
+        const idx = y * w + x;
+        const p = idx * 4;
+        const val = (gray[idx] * count <= sum * (1 - t)) ? 0 : 255;
+        data[p] = data[p + 1] = data[p + 2] = val;
+      }
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
+}
+
+$('convertBtn').addEventListener('click', async ()=>{
+  if(items.length === 0) return;
+  const btn = $('convertBtn');
+  btn.disabled = true;
+  const origText = btn.textContent;
+  btn.textContent = $('scanEffect').value !== 'none' ? 'Memproses efek scan...' : 'Membuat PDF...';
+  try{
+    const { jsPDF } = window.jspdf;
+    const pageMode = $('pageSize').value; // 'a4' or 'fit'
+    const compressKey = $('compressLevel').value; // 'high' | 'medium' | 'low' | 'none'
+    const preset = COMPRESS_PRESETS[compressKey];
+    const effect = $('scanEffect').value; // 'none' | 'gray' | 'bw'
+    let pdf = null;
+    let originalTotal = 0, compressedTotal = 0;
+
+    for(let i = 0; i < items.length; i++){
+      originalTotal += items[i].file.size;
+      const rawImg = await loadImage(items[i].dataUrl);
+
+      let embedDataUrl, embedFormat, w, h;
+      if(preset || effect !== 'none'){
+        const maxWidth = preset ? preset.maxWidth : undefined;
+        const quality = preset ? preset.quality : 0.85;
+        const { canvas, ctx, w: cw, h: ch } = renderToCanvas(rawImg, maxWidth);
+        applyScanEffect(ctx, cw, ch, effect);
+        embedDataUrl = canvas.toDataURL('image/jpeg', quality);
+        embedFormat = 'JPEG'; w = cw; h = ch;
+      } else {
+        embedDataUrl = items[i].dataUrl;
+        embedFormat = (items[i].file.type === 'image/png') ? 'PNG' : 'JPEG';
+        w = rawImg.width; h = rawImg.height;
+      }
+      compressedTotal += dataUrlSizeBytes(embedDataUrl);
+
+      const isLandscape = w >= h;
+      if(pageMode === 'fit'){
+        const orientation = isLandscape ? 'landscape' : 'portrait';
+        if(!pdf){
+          pdf = new jsPDF({ orientation, unit: 'px', format: [w, h] });
+        } else {
+          pdf.addPage([w, h], orientation);
+        }
+        pdf.addImage(embedDataUrl, embedFormat, 0, 0, w, h);
+      } else {
+        const orientation = isLandscape ? 'landscape' : 'portrait';
+        if(!pdf){
+          pdf = new jsPDF({ orientation, unit: 'mm', format: 'a4' });
+        } else {
+          pdf.addPage('a4', orientation);
+        }
+        const pageW = pdf.internal.pageSize.getWidth();
+        const pageH = pdf.internal.pageSize.getHeight();
+        const margin = 8;
+        const availW = pageW - margin*2, availH = pageH - margin*2;
+        const scale = Math.min(availW / w, availH / h);
+        const dw = w * scale, dh = h * scale;
+        const x = (pageW - dw) / 2, y = (pageH - dh) / 2;
+        pdf.addImage(embedDataUrl, embedFormat, x, y, dw, dh);
+      }
+    }
+
+    const name = ($('outName').value.trim() || 'dokumen').replace(/[\\/:*?"<>|]/g, '_');
+    const blob = pdf.output('blob');
+    const finalSize = blob.size;
+    pdf.save(name + '.pdf');
+
+    const reduction = originalTotal > 0 ? Math.round((1 - finalSize / originalTotal) * 100) : 0;
+    const msg = reduction > 0
+      ? `PDF dibuat (${formatSize(finalSize)}) — lebih kecil ${reduction}% dari total foto asli (${formatSize(originalTotal)})`
+      : `PDF berhasil dibuat: ${name}.pdf (${formatSize(finalSize)})`;
+    toast(msg);
+  }catch(err){
+    toast('Gagal membuat PDF: ' + err.message);
+  }finally{
+    btn.disabled = false;
+    btn.textContent = origText;
+  }
+});
+
+// ===== Gabung PDF =====
+
+function addPdfFiles(fileList){
+  const files = Array.from(fileList).filter(f => f.type === 'application/pdf' || /\.pdf$/i.test(f.name));
+  if(!files.length){ toast('Tidak ada file PDF yang valid'); return; }
+  for(const file of files){
+    mergeItems.push({ id: mergeSeq++, file });
+  }
+  renderMerge();
+}
+
+function renderMerge(){
+  const listEl = $('listMerge');
+  if(mergeItems.length === 0){
+    listEl.innerHTML = '<div class="empty">Belum ada PDF. Tambahkan file di atas untuk mulai.</div>';
+  } else {
+    listEl.innerHTML = mergeItems.map((it, i)=> `
+      <div class="item" data-id="${it.id}">
+        <div class="pdficon">PDF</div>
+        <div class="meta">
+          <div class="name">${escapeHtml(it.file.name || 'dokumen.pdf')}</div>
+          <div class="size">${formatSize(it.file.size)}</div>
+        </div>
+        <div class="btns">
+          <button data-act="up" ${i===0?'disabled':''} title="Naikkan urutan">↑</button>
+          <button data-act="down" ${i===mergeItems.length-1?'disabled':''} title="Turunkan urutan">↓</button>
+          <button data-act="rm" class="rm" title="Hapus">&times;</button>
+        </div>
+      </div>
+    `).join('');
+  }
+  $('countMerge').textContent = mergeItems.length
+    ? `${mergeItems.length} PDF dipilih — urutan di atas jadi urutan penggabungan`
+    : 'Belum ada PDF dipilih';
+  $('mergeBtn').disabled = mergeItems.length < 2;
+  const hint = $('sizehintMerge');
+  if(mergeItems.length === 0){ hint.textContent = ''; }
+  else{
+    const total = mergeItems.reduce((sum, it)=> sum + it.file.size, 0);
+    hint.textContent = mergeItems.length < 2
+      ? 'Tambahkan minimal 2 file PDF untuk digabung'
+      : `Total ukuran file asli: ${formatSize(total)}`;
+  }
+}
+
+$('listMerge').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button'); if(!btn) return;
+  const itemEl = e.target.closest('.item');
+  const id = Number(itemEl.dataset.id);
+  const idx = mergeItems.findIndex(it => it.id === id);
+  if(idx === -1) return;
+  const act = btn.dataset.act;
+  if(act === 'rm'){
+    mergeItems.splice(idx, 1);
+  } else if(act === 'up' && idx > 0){
+    [mergeItems[idx-1], mergeItems[idx]] = [mergeItems[idx], mergeItems[idx-1]];
+  } else if(act === 'down' && idx < mergeItems.length - 1){
+    [mergeItems[idx+1], mergeItems[idx]] = [mergeItems[idx], mergeItems[idx+1]];
+  }
+  renderMerge();
+});
+
+const dropMerge = $('dropMerge');
+dropMerge.addEventListener('click', ()=> $('fileInputMerge').click());
+$('fileInputMerge').addEventListener('change', (e)=>{
+  addPdfFiles(e.target.files);
+  e.target.value = '';
+});
+['dragenter','dragover'].forEach(ev=>{
+  dropMerge.addEventListener(ev, (e)=>{ e.preventDefault(); dropMerge.classList.add('drag'); });
+});
+['dragleave','drop'].forEach(ev=>{
+  dropMerge.addEventListener(ev, (e)=>{ e.preventDefault(); dropMerge.classList.remove('drag'); });
+});
+dropMerge.addEventListener('drop', (e)=>{
+  if(e.dataTransfer && e.dataTransfer.files) addPdfFiles(e.dataTransfer.files);
+});
+
+function downloadBlob(bytes, filename){
+  const blob = new Blob([bytes], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(()=> URL.revokeObjectURL(url), 1000);
+  return blob;
+}
+
+$('mergeBtn').addEventListener('click', async ()=>{
+  if(mergeItems.length < 2) return;
+  const btn = $('mergeBtn');
+  btn.disabled = true;
+  const origText = btn.textContent;
+  btn.textContent = 'Menggabungkan PDF...';
+  try{
+    const { PDFDocument } = PDFLib;
+    const mergedPdf = await PDFDocument.create();
+    let originalTotal = 0;
+
+    for(const it of mergeItems){
+      originalTotal += it.file.size;
+      const bytes = await it.file.arrayBuffer();
+      let donorPdf;
+      try{
+        donorPdf = await PDFDocument.load(bytes, { ignoreEncryption: true });
+      }catch(e){
+        throw new Error(`Gagal membaca "${it.file.name}" — pastikan file PDF valid dan tidak terkunci password`);
+      }
+      const pages = await mergedPdf.copyPages(donorPdf, donorPdf.getPageIndices());
+      pages.forEach(p => mergedPdf.addPage(p));
+    }
+
+    const mergedBytes = await mergedPdf.save();
+    const name = ($('outNameMerge').value.trim() || 'gabungan').replace(/[\\/:*?"<>|]/g, '_');
+    const blob = downloadBlob(mergedBytes, name + '.pdf');
+    toast(`PDF gabungan berhasil dibuat: ${name}.pdf (${formatSize(blob.size)})`);
+  }catch(err){
+    toast('Gagal menggabungkan PDF: ' + err.message);
+  }finally{
+    btn.disabled = false;
+    btn.textContent = origText;
+  }
+});
+
+renderMerge();
+render();
+</script>
+</body>
+</html>
